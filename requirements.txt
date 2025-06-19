@@ -1,0 +1,9 @@
+# python >= 3.10
+optax == 0.2.4
+jax == 0.5.3
+jaxlib == 0.5.3
+scikit-learn == 1.6.1
+PennyLane == 0.38.0
+numpy == 1.26.4
+tqdm
+matplotlib == 3.10.1
