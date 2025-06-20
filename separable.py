@@ -7,7 +7,8 @@ jax.config.update("jax_enable_x64", True)
 
 seq_length = 10
 hidden_size = 8
-
+n_layers = 3
+n_qubits = 5
 
 class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
     def __init__(
@@ -23,7 +24,9 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
             convergence_interval=200,
             dev_type="default.qubit",
             qnode_kwargs={"interface": "jax"},
-            hidden_size=hidden_size
+            hidden_size=hidden_size,
+            n_qubits_=4,
+            layers=5
     ):
         # attributes that do not depend on data
         self.encoding_layers = encoding_layers
@@ -47,7 +50,8 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
         # data-dependant attributes
         # which will be initialised by calling "fit"
         self.params_ = None  # Dictionary containing the trainable parameters
-        self.n_qubits_ = None
+        self.n_qubits_ = n_qubits_
+        self.n_layers_ = layers
         self.scaler = None  # data scaler will be fitted on training data
         self.circuit = None
 
@@ -56,35 +60,34 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
 
     def construct_model(self):
 
-        dev = qml.device(self.dev_type, wires=4)
+        dev = qml.device(self.dev_type, wires=self.n_qubits_)
 
         @qml.qnode(dev, **self.qnode_kwargs)
         def single_qubit_circuit(params, input_val, hidden_state):
             # 将隐藏状态编码到量子电路
-            for i in range(4):
+            for i in range(self.n_qubits_):
                 qml.RY(hidden_state[i], wires=i)
 
             # 输入编码
             qml.RY(input_val, wires=0)
 
             # 参数化层
-            n_layers = params.shape[0]
-            for layer in range(n_layers):
+            for layer in range(self.n_layers_):
                 # 单量子比特旋转
-                for i in range(4):
+                for i in range(self.n_qubits_):
                     qml.RY(params[layer, i], wires=i)
 
                 # 纠缠层
-                for i in range(3):
+                for i in range(self.n_qubits_-1):
                     qml.CNOT(wires=[i, i + 1])
 
             # 返回期望值
-            return [qml.expval(qml.PauliZ(i)) for i in range(4)]
+            return [qml.expval(qml.PauliZ(i)) for i in range(self.n_qubits_)]
 
         self.circuit = single_qubit_circuit
 
         def circuit(params, input_seq):
-            hidden_state = jnp.zeros((4, self.hidden_size))
+            hidden_state = jnp.zeros((self.n_qubits_, self.hidden_size))
 
             for x in input_seq:
                 # 执行量子循环单元
@@ -109,7 +112,6 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
             classes (array-like): class labels that the classifier expects
         """
 
-        self.n_qubits_ = n_features
         self.initialize_params()
         self.construct_model()
 
@@ -124,7 +126,7 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
                 2
                 * jnp.pi
                 * jax.random.uniform(
-            shape=(self.n_qubits_, 4, self.hidden_size),
+            shape=(self.n_layers_, self.n_qubits_, self.hidden_size),
             key=self.generate_key(),
         )
         )
@@ -133,9 +135,9 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
             jax.random.normal(shape=(self.hidden_size, 1), key=self.generate_key())
         )
         output_weights2 = (
-            jax.random.normal(shape=(1, 4), key=self.generate_key())
+            jax.random.normal(shape=(1, self.n_qubits_), key=self.generate_key())
         )
-        output_bias = jax.random.normal(shape=(4, 1), key=self.generate_key())
+        output_bias = jax.random.normal(shape=(self.n_qubits_, 1), key=self.generate_key())
         output_bias2 = jax.random.normal(shape=(1,), key=self.generate_key())
 
         self.params_ = {"weights": weights,
@@ -212,7 +214,7 @@ if __name__ == "__main__":
     X_train, X_test = X[:train_size], X[train_size:]
     y_train, y_test = y[:train_size], y[train_size:]
 
-    model = SeparableVariationalClassifier(jit=True, max_vmap=32)
+    model = SeparableVariationalClassifier(jit=True, max_vmap=32, layers=n_layers,n_qubits_=n_qubits)
     model.fit(X_train, y_train)
     train_predictions = np.array(model.predict(X_train))
     test_predictions = np.array(model.predict(X_test))
