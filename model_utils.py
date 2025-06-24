@@ -111,6 +111,7 @@ def train(
             )
             loss_history.append(loss_val)
             logging.debug(f"{step} - loss: {loss_val}")
+            pbar.set_postfix(loss=round(loss_val,4))
             pbar.update(1)
 
             if np.isnan(loss_val):
@@ -141,12 +142,6 @@ def train(
     loss_history = np.array(loss_history)
     model.loss_history_ = loss_history / np.max(np.abs(loss_history))
     model.training_time_ = end - start
-
-    if not converged and convergence_interval is not None:
-        print("Loss did not converge:", loss_history)
-        raise ConvergenceWarning(
-            f"Model {model.__class__.__name__} has not converged after the maximum number of {model.max_steps} steps."
-        )
 
     return params
 
