@@ -154,4 +154,5 @@ test.py
             [qml.PauliZ(0), qml.PauliZ(1), qml.PauliZ(2)]
         )
         return qml.expval(H)
-结果：
+结果：  
+![Figure_4.png](Figure_4.png)

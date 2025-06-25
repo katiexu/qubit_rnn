@@ -6,6 +6,9 @@ from sklearn.preprocessing import MinMaxScaler
 import time
 import copy
 from tqdm import tqdm
+import matplotlib
+
+matplotlib.use('TkAgg')
 
 
 class QuantumRNN:
@@ -296,7 +299,7 @@ if __name__ == "__main__":
     # 训练模型
     print("Starting training...")
     start_train = time.time()
-    train_losses, val_losses = qrnn.train(X_train, y_train, X_val, y_val, epochs=80)
+    train_losses, val_losses = qrnn.train(X_train, y_train, X_val, y_val, epochs=15)
     train_time = time.time() - start_train
     print(f"Training completed in {train_time:.2f} seconds")
 
